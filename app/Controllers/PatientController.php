@@ -3,90 +3,104 @@ declare(strict_types=1);
 
 final class PatientController
 {
-    public function __construct(
-        private Patient $patientModel
-    ) {}
+    public function __construct(private Patient $patients) {}
 
-    // Hiển thị danh sách bệnh nhân
+    private function id(): int
+    {
+        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1]
+        ]);
+        if ($id === false || $id === null) {
+            http_response_code(400);
+            exit('ID không hợp lệ.');
+        }
+        return $id;
+    }
+
+    private function getPatient(): array
+    {
+        $patient = $this->patients->find($this->id());
+        if ($patient === null) {
+            http_response_code(404);
+            exit('Không tìm thấy bệnh nhân.');
+        }
+        return $patient;
+    }
+
     public function index(): void
     {
-        $patients = $this->patientModel->all();
-
+        requireWebAuth();
+        $q = $_GET['q'] ?? '';
+        $q = is_string($q) ? trim($q) : '';
+        $yearRaw = $_GET['year'] ?? '';
+        $year = null;
+        if (is_string($yearRaw) && $yearRaw !== '') {
+            $parsed = filter_var($yearRaw, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1900, 'max_range' => (int) date('Y')]
+            ]);
+            if ($parsed !== false) $year = $parsed;
+        }
+        $page = filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1]
+        ]) ?: 1;
+        $limit = 10;
+        $total = $this->patients->countMatching($q, $year);
+        $totalPages = max(1, (int) ceil($total / $limit));
+        $page = min($page, $totalPages);
+        $patients = $this->patients->paged($q, $year, $page, $limit);
+        $success = $_SESSION['flash_success'] ?? null;
         $error = $_SESSION['flash_error'] ?? null;
-        unset($_SESSION['flash_error']);
-
+        unset($_SESSION['flash_success'], $_SESSION['flash_error']);
         require __DIR__ . '/../Views/patients/index.php';
     }
 
-    // Xử lý thêm bệnh nhân
+    public function show(): void
+    {
+        requireWebAuth();
+        $patient = $this->getPatient();
+        require __DIR__ . '/../Views/patients/show.php';
+    }
+
+    public function edit(): void
+    {
+        requireWebAuth();
+        $patient = $this->getPatient();
+        require __DIR__ . '/../Views/patients/edit.php';
+    }
+
     public function store(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            header('Allow: POST');
-            echo 'Phương thức không hợp lệ';
-            return;
+        requireWebAuth();
+        requireWebCsrf();
+        try {
+            [$name, $year] = patientInput($_POST);
+            $this->patients->create($name, $year);
+            redirectWithMessage('Đã thêm bệnh nhân thành công.');
+        } catch (InvalidArgumentException $e) {
+            redirectWithMessage($e->getMessage(), 'error');
         }
+    }
 
-        // Kiểm tra CSRF token
-        $token = $_POST['csrf_token'] ?? null;
-
-        if (
-            !is_string($token) ||
-            !hash_equals(
-                $_SESSION['csrf_token'] ?? '',
-                $token
-            )
-        ) {
-            http_response_code(403);
-            echo 'CSRF token không hợp lệ';
-            return;
+    public function update(): void
+    {
+        requireWebAuth();
+        requireWebCsrf();
+        $patient = $this->getPatient();
+        try {
+            [$name, $year] = patientInput($_POST);
+            $this->patients->update((int) $patient['id'], $name, $year);
+            redirectWithMessage('Đã cập nhật bệnh nhân.');
+        } catch (InvalidArgumentException $e) {
+            redirectWithMessage($e->getMessage(), 'error');
         }
+    }
 
-        $nameInput = $_POST['name'] ?? null;
-        $yearInput = $_POST['birth_year'] ?? null;
-
-        if (
-            !is_string($nameInput) ||
-            !is_string($yearInput)
-        ) {
-            $_SESSION['flash_error'] = 'Dữ liệu không hợp lệ';
-            header('Location: index.php');
-            exit;
-        }
-
-        $name = trim($nameInput);
-
-        $birthYear = filter_var(
-            $yearInput,
-            FILTER_VALIDATE_INT,
-            [
-                'options' => [
-                    'min_range' => 1900,
-                    'max_range' => (int) date('Y')
-                ]
-            ]
-        );
-
-        if (
-            preg_match('/\A.{1,150}\z/u', $name) !== 1 ||
-            $birthYear === false
-        ) {
-            $_SESSION['flash_error'] =
-                'Họ tên hoặc năm sinh không hợp lệ';
-
-            header('Location: index.php');
-            exit;
-        }
-
-        // Gọi Model để lưu dữ liệu
-        $this->patientModel->create(
-            $name,
-            $birthYear
-        );
-
-        // Chuyển về trang danh sách
-        header('Location: index.php');
-        exit;
+    public function destroy(): void
+    {
+        requireWebAuth();
+        requireWebCsrf();
+        $patient = $this->getPatient();
+        $this->patients->delete((int) $patient['id']);
+        redirectWithMessage('Đã xóa bệnh nhân.');
     }
 }

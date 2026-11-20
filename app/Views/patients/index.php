@@ -1,192 +1,91 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1">
-
-    <title>Quản lý bệnh nhân MVC</title>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 24px;
-            background: #f4f6f8;
-            color: #17212b;
-        }
-
-        main {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            padding: 24px;
-            border-radius: 10px;
-        }
-
-        form {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: end;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .field {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            flex: 1 1 180px;
-        }
-
-        input {
-            padding: 10px;
-            border: 1px solid #aaa;
-            border-radius: 5px;
-            width: 100%;
-        }
-
-        input:focus-visible,
-        button:focus-visible {
-            outline: 2px solid #2563eb;
-            outline-offset: 2px;
-        }
-
-        button {
-            background: #2563eb;
-            color: white;
-            border: none;
-            padding: 11px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-
-        th {
-            background: #e9efff;
-        }
-
-        .error {
-            color: #b91c1c;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Danh sách bệnh nhân - MVC DEMO</title>
+    <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-<main>
-    <h1>Quản lý bệnh nhân</h1>
-    <h2>Thêm bệnh nhân</h2>
-
-    <?php if ($error !== null): ?>
-        <p class="error">
-            <?= htmlspecialchars(
-                $error,
-                ENT_QUOTES,
-                'UTF-8'
-            ) ?>
-        </p>
-    <?php endif; ?>
-
-    <form action="index.php?action=store"
-          method="POST">
-
-        <input
-            type="hidden"
-            name="csrf_token"
-            value="<?= htmlspecialchars(
-                $_SESSION['csrf_token'],
-                ENT_QUOTES,
-                'UTF-8'
-            ) ?>"
-        >
-
-        <div class="field">
-            <label for="name">Họ và tên</label>
-            <input
-                type="text"
-                id="name"
-                name="name"
-                maxlength="150"
-                required
-            >
+<main class="container">
+    <header class="topbar">
+        <div>
+            <h1>Quản lý bệnh nhân MVC</h1>
+            <p class="muted">Xin chào, <?= h((string) $_SESSION['username']) ?></p>
         </div>
+        <form method="post" action="index.php?action=logout">
+            <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
+            <button type="submit" class="danger-outline">Đăng xuất</button>
+        </form>
+    </header>
 
-        <div class="field">
-            <label for="birth_year">Năm sinh</label>
-            <input
-                type="number"
-                id="birth_year"
-                name="birth_year"
-                min="1900"
-                max="<?= (int) date('Y') ?>"
-                required
-            >
-        </div>
+    <?php if ($success !== null): ?><p class="alert success"><?= h($success) ?></p><?php endif; ?>
+    <?php if ($error !== null): ?><p class="alert error"><?= h($error) ?></p><?php endif; ?>
 
-        <button type="submit">
-            Thêm bệnh nhân
-        </button>
-    </form>
+    <section class="panel">
+        <h2>Thêm bệnh nhân</h2>
+        <form method="post" action="index.php?action=store" class="inline-form">
+            <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
+            <div class="field grow"><label for="name">Họ và tên</label>
+                <input id="name" name="name" type="text" maxlength="150" required>
+            </div>
+            <div class="field"><label for="birth_year">Năm sinh</label>
+                <input id="birth_year" name="birth_year" type="number" min="1900" max="<?= date('Y') ?>" required>
+            </div>
+            <button type="submit">Thêm bệnh nhân</button>
+        </form>
+    </section>
 
-    <h2>Danh sách bệnh nhân</h2>
+    <section class="panel">
+        <h2>Tìm kiếm và lọc</h2>
+        <form method="get" action="index.php" class="inline-form">
+            <input type="hidden" name="action" value="index">
+            <div class="field grow"><label for="q">Tên bệnh nhân hoặc ID</label>
+                <input id="q" name="q" type="text" value="<?= h($q) ?>" placeholder="Nhập tên hoặc ID">
+            </div>
+            <div class="field"><label for="year">Năm sinh (tùy chọn)</label>
+                <input id="year" name="year" type="number" min="1900" max="<?= date('Y') ?>" value="<?= h((string) ($year ?? '')) ?>">
+            </div>
+            <button type="submit">Tìm kiếm</button>
+            <a class="button secondary" href="index.php">Xóa lọc</a>
+        </form>
+    </section>
 
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Họ tên</th>
-                    <th>Năm sinh</th>
-                </tr>
-            </thead>
-
+    <section class="panel">
+        <div class="section-title"><h2>Danh sách bệnh nhân</h2><span class="muted"><?= $total ?> kết quả</span></div>
+        <div class="table-scroll"><table>
+            <thead><tr><th>ID</th><th>Họ tên</th><th>Năm sinh</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead>
             <tbody>
-                <?php foreach ($patients as $patient): ?>
-                    <tr>
-                        <td>
-                            <?= (int) $patient['id'] ?>
-                        </td>
-                        <td>
-                            <?= htmlspecialchars(
-                                $patient['name'],
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>
-                        </td>
-                        <td>
-                            <?= (int) $patient['birth_year'] ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-
-                <?php if (empty($patients)): ?>
-                    <tr>
-                        <td colspan="3">
-                            Chưa có bệnh nhân nào.
-                        </td>
-                    </tr>
-                <?php endif; ?>
+            <?php foreach ($patients as $patient): ?>
+                <tr>
+                    <td><?= (int) $patient['id'] ?></td>
+                    <td><?= h($patient['name']) ?></td>
+                    <td><?= (int) $patient['birth_year'] ?></td>
+                    <td><?= h($patient['created_at']) ?></td>
+                    <td>
+                        <div class="actions">
+                            <a href="index.php?action=show&amp;id=<?= (int) $patient['id'] ?>">Chi tiết</a>
+                            <a href="index.php?action=edit&amp;id=<?= (int) $patient['id'] ?>">Sửa</a>
+                            <form method="post" action="index.php?action=delete&amp;id=<?= (int) $patient['id'] ?>" onsubmit="return confirm('Bạn chắc chắn muốn xóa bệnh nhân này?');">
+                                <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
+                                <button class="link-danger" type="submit">Xóa</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (!$patients): ?><tr><td colspan="5" class="empty">Không tìm thấy bệnh nhân phù hợp.</td></tr><?php endif; ?>
             </tbody>
-        </table>
-    </div>
+        </table></div>
+        <?php if ($totalPages > 1): ?>
+            <nav class="pagination" aria-label="Phân trang danh sách bệnh nhân">
+                <?php for ($n = 1; $n <= $totalPages; $n++): ?>
+                    <?php $href = 'index.php?' . http_build_query(['action' => 'index', 'q' => $q, 'year' => $year ?? '', 'page' => $n]); ?>
+                    <a href="<?= h($href) ?>" <?= $n === $page ? 'class="current" aria-current="page"' : '' ?>><?= $n ?></a>
+                <?php endfor; ?>
+            </nav>
+        <?php endif; ?>
+    </section>
 </main>
 </body>
 </html>
